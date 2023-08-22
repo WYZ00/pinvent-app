@@ -3,6 +3,8 @@ const express = require("express");
 const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
 const cors = require("cors");
+const userRoute = require("./routes/userRoute");
+const errorHandler = require("./middleWares/errorMiddleWare.js");
 
 const app = express();
 
@@ -10,9 +12,14 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
+app.use("/api/users", userRoute);
+
 app.get("/", (req, res) => {
   res.send("Home Page");
 });
+
+//error middleware
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
