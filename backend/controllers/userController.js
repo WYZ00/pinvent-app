@@ -2,6 +2,9 @@ const asyncHandler = require("express-async-handler");
 const User = require("../models/userModel");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
+const Token = require("../models/tokenModel");
+const crypto = require("crypto");
+const sendEmail = require("../utils/sendEmail");
 
 // Generate Token
 const generateToken = (id) => {
@@ -210,6 +213,59 @@ const changePassword = asyncHandler(async (req, res) => {
   }
 });
 
+const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    res.status(404);
+    throw new Error("User doesn't exist!");
+  }
+
+  let resetToken = crypto.randomBytes(32).toString("hex") + user._id;
+
+  const hashedToken = crypto
+    .createHash("sha256")
+    .update(resetToken)
+    .digest("hex");
+
+  await new Token({
+    userId: user._id,
+    token: hashedToken,
+    createAt: Date.now(),
+    expiredAt: Date.now() + 30 * (60 * 1000), //30 minute
+  }).save();
+
+  const resetUrl = `${process.env.FRONTEND_URL}/resetpassword/${resetToken}`;
+
+  const message = `
+  <h2>Hello ${user.name}</h2>
+  <p>Please use the url below to reset your
+  password</p>
+
+  <p>This reset link is valid for 30 minutes</p>
+
+  <<a href=${resetUrl} clicktracking=off>${resetUrl}</a>
+
+  <<p>Regards...</p>
+  <p>Pinvent team</p>
+  `;
+
+  const subject = "Password Reset Request";
+  const send_to = user.email;
+  const send_from = process.env.EMAIL_USER;
+
+  try {
+    await sendEmail(subject, message, send_to, send_from);
+
+    res.status(200).json({ success: true, message: "Reset Email sent.." });
+  } catch (error) {
+    res.status(500);
+    throw new Error("Email not sent.Please try again");
+  }
+});
+
 module.exports = {
   registerUser,
   loginUser,
@@ -218,4 +274,5 @@ module.exports = {
   loginStatus,
   updateUser,
   changePassword,
+  forgotPassword,
 };
